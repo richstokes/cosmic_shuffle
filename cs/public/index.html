@@ -1,0 +1,365 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>Cosmic Shuffle</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+
+  <style type="text/css">
+    #login,
+    #loggedin {
+      display: none;
+    }
+
+    #playlist-url {
+      display: none;
+    }
+
+    .text-overflow {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      width: 500px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="pb-2 mt-4 mb-2 border-bottom">
+      <h1>Cosmic Shuffle <small class="text-muted">Truly random playlists</small></h1>
+    </div>
+    <div id="login">
+      <p class="lead">Introducing Cosmic Shuffle,
+        the app that utilizes the <a href="https://aip.scitation.org/doi/abs/10.1063/1.3597793">quantum power</a>
+        of the cosmic microwave background to give your Spotify playlist a truly
+        random shuffle!</p>
+
+      <p class="lead">Cosmic Shuffle takes things to the next level
+        by using the random noise from the oldest signals in the universe
+        to mix up your playlists in a way
+        you've never heard before.</p>
+
+      <p>The app takes your liked songs and shuffle them into a brand new playlist. It does not modify or delete any
+        of your existing playlists. </p>
+
+      <br>
+
+      <h4>Privacy Note</h4>
+      <p>To access and modify a user's Spotify playlist, Cosmic Shuffle needs permission from the user through the
+        Spotify API. Without this permission, Cosmic Shuffle cannot access or modify the user's playlist. By granting
+        Cosmic Shuffle permission to their Spotify account, users can fully enjoy the app's unique shuffle experience.
+      </p>
+
+      <p>We do not collect or store any personal data, nor do we share any information with marketing companies. </p>
+
+      <br>
+
+      <a href="/login" class="btn btn-primary">Log in with Spotify</a>
+      <a href="mailto:hello@cosmicshuffle.app" class="btn btn-info">Contact</a>
+      <a href="https://www.spotify.com/"><img src="Spotify_Logo_CMYK_Green.png" width="100" /></a>
+    </div>
+
+    <!-- Displays if we are logged in -->
+    <div id="loggedin">
+      <p class="lead">Clicking the button below will create a new playlist in your account named "Cosmic Shuffled
+        Songs".</p>
+      <p class="lead">This app takes all the songs in the selected playlist and shuffles them into a new playlist.
+        It's best to let this new playlist run with shuffle OFF, to avoid Spotify repeating songs.</p>
+      </p>
+      <br>
+
+      <div class="input-group mb-3 w-50">
+        <div class="input-group-prepend">
+          <label class="input-group-text" for="inputGroupSelect01">Select a Playlist</label>
+
+        </div>
+        <select class="custom-select" id="playlist-dropdown">
+          <option selected>Liked Songs (default)</option>
+        </select>
+      </div>
+      <!-- <br> -->
+
+      <div id="playlist-status"></div>
+      <div id="playlist-url"></div>
+      <div id="user-profile"></div>
+
+      <br>
+      <!-- <div id="oauth">
+      </div> -->
+      <!-- <button class="btn btn-default" id="obtain-new-token">Obtain new token using the refresh token</button> -->
+      <br><br>
+      <button class="btn btn-primary" id="shuffle-liked">Shuffle!</button>
+      <a href="mailto:hello@cosmicshuffle.app" class="btn btn-info">Contact</a>
+      <a href="https://www.paypal.com/donate/?business=MFLJVFQXAJKAJ&no_recurring=0&item_name=Help+fund+server+costs%21&currency_code=USD"
+        class="btn btn-info">Donate</a>
+      <button class="btn btn-warning" id="logout">Logout</button>
+      <a href="https://www.spotify.com/"><img src="Spotify_Logo_CMYK_Green.png" width="100" /></a>
+    </div>
+  </div>
+
+  <script id="playlist-status-template" type="text/x-handlebars-template">
+    <span class="badge rounded-pill text-bg-secondary" style="float:left;margin-bottom:5px;margin-right:10px;padding:10px">{{playlist_status}}</span>
+  </script>
+
+  <script id="playlist-url-template" type="text/x-handlebars-template">
+  <a href="{{playlist_url}}">
+    <span class="badge rounded-pill text-bg-success" style="float:left;margin-bottom:5px;padding:10px">Playlist Ready!</span>
+  </a>
+  </script>
+
+  <script id="user-profile-template" type="text/x-handlebars-template">
+      <div class="media">
+        <!-- <div class="pull-left">
+          <img class="media-object" width="150" src="{{images.0.url}}" />
+        </div> -->
+        <div class="media-body">
+          <dl class="dl-horizontal">
+            <!-- <dt>Logged in as</dt><dd class="clearfix">{{display_name}}</dd> -->
+            <!-- <span class="label label-info">Logged in as {{display_name}}</span> -->
+            <!-- <dt>ID</dt><dd>{{id}}</dd> -->
+            <!-- <dt>Email</dt><dd>{{email}}</dd>
+            <dt>Spotify URI</dt><dd><a href="{{external_urls.spotify}}">{{external_urls.spotify}}</a></dd>
+            <dt>Link</dt><dd><a href="{{href}}">{{href}}</a></dd>
+            <dt>Profile Image</dt><dd class="clearfix"><a href="{{images.0.url}}">{{images.0.url}}</a></dd>
+            <dt>Country</dt><dd>{{country}}</dd> -->
+          </dl>
+        </div>
+      </div>
+    </script>
+
+  <!-- <script id="oauth-template" type="text/x-handlebars-template">
+      <h2>oAuth info</h2>
+      <dl class="dl-horizontal">
+        <dt>Access token</dt><dd class="text-overflow">{{access_token}}</dd>
+        <dt>Refresh token</dt><dd class="text-overflow">{{refresh_token}}</dd>
+      </dl>
+    </script> -->
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.7.7/handlebars.min.js"></script>
+  <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+
+  <script>
+    (function () {
+
+      /**
+       * Obtains parameters from the hash of the URL
+       * @return Object
+       */
+      function getHashParams() {
+        var hashParams = {};
+        var e, r = /([^&;=]+)=?([^&;]*)/g,
+          q = window.location.hash.substring(1);
+        while (e = r.exec(q)) {
+          hashParams[e[1]] = decodeURIComponent(e[2]);
+        }
+        return hashParams;
+      }
+
+      var userProfileSource = document.getElementById('user-profile-template').innerHTML,
+        userProfileTemplate = Handlebars.compile(userProfileSource),
+        userProfilePlaceholder = document.getElementById('user-profile');
+
+      // var oauthSource = document.getElementById('oauth-template').innerHTML,
+      //   oauthTemplate = Handlebars.compile(oauthSource),
+      //   oauthPlaceholder = document.getElementById('oauth');
+
+      var playlistUrlSource = document.getElementById('playlist-url-template').innerHTML,
+        playlistUrlTemplate = Handlebars.compile(playlistUrlSource),
+        playlistUrlPlaceholder = document.getElementById('playlist-url');
+
+      var playlistStatusSource = document.getElementById('playlist-status-template').innerHTML,
+        playlistStatusTemplate = Handlebars.compile(playlistStatusSource),
+        playlistStatusPlaceholder = document.getElementById('playlist-status');
+
+      var params = getHashParams();
+
+      var access_token = params.access_token,
+        refresh_token = params.refresh_token,
+        playlist_status = params.playlist_status,
+        playlist_url = params.playlist_url,
+        error = params.error;
+
+      if (error) {
+        alert('There was an error during the authentication, resetting');
+        window.location.href = '../';
+      } else {
+        if (access_token) {
+          // render oauth info
+          // oauthPlaceholder.innerHTML = oauthTemplate({
+          //   access_token: access_token,
+          //   refresh_token: refresh_token
+          // });
+
+          // render playlist_status
+          playlistStatusPlaceholder.innerHTML = playlistStatusTemplate({
+            playlist_status: 'Press the "Shuffle" button below to start!'
+          });
+
+          // render playlist_url
+          playlistUrlPlaceholder.innerHTML = playlistUrlTemplate({
+            playlist_url: ' '
+          });
+
+          let user_id = '';
+
+          $.ajax({ // Get user profile -- TODO: probably dont need this, other than to show the loggedin
+            url: 'https://api.spotify.com/v1/me',
+            headers: {
+              'Authorization': 'Bearer ' + access_token
+            },
+            async: false, // because we need to get the user_id before we can get the playlists
+            success: function (response) {
+              userProfilePlaceholder.innerHTML = userProfileTemplate(response);
+
+              user_id = response.id;
+              // console.log('User ID: ' + user_id);
+              $('#login').hide();
+              $('#loggedin').show();
+            },
+            error: function (err) {
+              console.log("AJAX error in request: " + JSON.stringify(err, null, 2));
+              console.log("Resetting access token and refresh token");
+              window.location.href = '../';
+            }
+          });
+
+          // Second AJAX call after logging in, to grab the users playlists
+          let endpoint = 'https://api.spotify.com/v1/users/' + user_id + '/playlists?offset=0&limit=50';
+          let playlists = [];
+
+          while (endpoint) {
+            console.log('Getting playlists from: ' + endpoint);
+            $.ajax(({
+              url: endpoint,
+              headers: {
+                'Authorization': 'Bearer ' + access_token
+              },
+              async: false,
+              dataType: 'json',
+              success: function (response) {
+                // console.log("Playlists via browser: " + JSON.stringify(response, null, 2));
+
+                for (let i = 0; i < response.items.length; i++) {
+                  console.log('Adding playlist: ' + response.items[i].name)
+                  playlists.push([response.items[i].name, response.items[i].id]);
+                }
+
+                if (!response.items) {
+                  console.log('No items returned');
+                  endpoint = null;
+                  return null;
+                }
+
+                // console.log('response.next: ' + response.next);
+                endpoint = response.next; // if null, we're done paging
+              },
+              error: function (err) {
+                console.log("AJAX error during playlists request: " + JSON.stringify(err, null, 2));
+                endpoint = null; // break out of loop
+                // console.log("Resetting access token and refresh token");
+                // window.location.href = '../';
+              }
+            }));
+          } // end of "while endpoint" playlist pagination
+
+          if (playlists) {
+            // console.log('Dumping playlists:' + JSON.stringify(playlists, null, 2));
+            console.log('Got Final Playlists Count: ' + playlists.length);
+
+            // Update the dropdown with the playlists
+            let playlistDropdown = document.getElementById('playlist-dropdown');
+            for (let i = 0; i < playlists.length; i++) {
+              let option = document.createElement('option');
+              option.text = playlists[i][0];
+              option.value = playlists[i][1];
+              playlistDropdown.add(option);
+              // playlistDropdown.append();
+            }
+          }
+        }
+        else { // not logged in || no access_token
+          // render initial screen
+          $('#login').show();
+          $('#loggedin').hide();
+        }
+
+        // REFRESH TOKEN BUTTON
+        // document.getElementById('obtain-new-token').addEventListener('click', function () {
+        //   $.ajax({
+        //     url: '/refresh_token',
+        //     data: {
+        //       'refresh_token': refresh_token
+        //     }
+        //   }).done(function (data) {
+        //     access_token = data.access_token;
+        //     oauthPlaceholder.innerHTML = oauthTemplate({
+        //       access_token: access_token,
+        //       refresh_token: refresh_token
+        //     });
+        //   });
+        // }, false);
+
+        // SHUFFLE BUTTON
+        document.getElementById('shuffle-liked').addEventListener('click', function () {
+          playlistStatusPlaceholder.innerHTML = playlistStatusTemplate({
+            playlist_status: 'Processing..'
+          });
+          document.getElementById('playlist-url').style.display = 'none';
+          playlist_id = document.getElementById('playlist-dropdown').value;
+          playlist_name = document.getElementById('playlist-dropdown').options[document.getElementById('playlist-dropdown').selectedIndex].text;
+          console.log('Shuffling playlist: ' + playlist_id + ' (' + playlist_name + ')');
+
+          $.ajax({
+            url: '/shuffle_liked',
+            data: {
+              access_token: access_token, playlist_id, playlist_name // make the access token available to the server
+            },
+            error: function (err) {
+              console.log("AJAX error in request: " + JSON.stringify(err, null, 2));
+              playlistStatusPlaceholder.innerHTML = playlistStatusTemplate({
+                playlist_status: 'Error, please try again! (' + err.statusText + ')'
+              });
+              //wait 2 seconds and then redirect to the login page
+              setTimeout(function () {
+                window.location.href = '../';
+              }, 2000);
+            },
+            timeout: 300000 // sets timeout to 5 minutes
+          }).done(function (data) {
+            console.log('Shuffle done! Count of tracks shuffled:' + data.playlist_status)
+
+            playlist_status = data.playlist_status;
+            playlist_url = data.playlist_url;
+
+            if (playlist_status == 'error') {
+              console.error('playlist_status error, restarting')
+              playlistStatusPlaceholder.innerHTML = playlistStatusTemplate({
+                playlist_status: 'Error, please try again! (' + data.playlist_url + ')'
+              });
+              //wait 2 seconds and then redirect to the login page
+              setTimeout(function () {
+                window.location.href = '../';
+              }, 2000);
+            } else { // update page with data
+              playlistStatusPlaceholder.innerHTML = playlistStatusTemplate({
+                playlist_status: playlist_status + ' songs shuffled!'
+              });
+              playlistUrlPlaceholder.innerHTML = playlistUrlTemplate({
+                playlist_url: playlist_url
+              });
+              document.getElementById('playlist-url').style.display = 'block'; // unhide the playlist url
+            }
+          });
+        }, false);
+
+        // LOGOUT button
+        document.getElementById('logout').addEventListener('click', function () {
+          window.location.href = '../';
+        }, false);
+      }
+    })();
+  </script>
+</body>
+
+</html>
